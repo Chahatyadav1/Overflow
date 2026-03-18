@@ -1,7 +1,12 @@
 const dotenv = require('dotenv');
 const Joi = require('joi');
 
-dotenv.config();
+// Load environment file based on NODE_ENV
+if (process.env.NODE_ENV === 'test') {
+  dotenv.config({ path: '.env.test' });
+} else {
+  dotenv.config();
+}
 
 const envVarsSchema = Joi.object({
   NODE_ENV: Joi.string().valid('development', 'production', 'test').default('development'),

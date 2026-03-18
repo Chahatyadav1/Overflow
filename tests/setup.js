@@ -8,11 +8,13 @@ beforeAll(async () => {
   const mongoUri = mongoServer.getUri();
   process.env.MONGO_URI = mongoUri;
   await mongoose.connect(mongoUri);
-});
+}, 10000); // Increase timeout for slow CI environments
 
 afterAll(async () => {
   await mongoose.disconnect();
-  await mongoServer.stop();
+  if (mongoServer) {
+    await mongoServer.stop();
+  }
 });
 
 afterEach(async () => {
