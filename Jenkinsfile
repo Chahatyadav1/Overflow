@@ -9,7 +9,7 @@ pipeline {
     environment {
         SONAR_SCANNER_HOME = tool 'sonarqube'
         JWT_SECRET = 'jenkins-jwt-secret'
-        MONGO_URI = 'mongodb://localhost:27017/test' // overridden in tests
+        MONGO_URI = 'mongodb://localhost:27017/test' 
     }
 
     stages {
