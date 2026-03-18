@@ -2,37 +2,75 @@ pipeline {
     agent any
 
     tools {
-        nodejs 'NodeJS-18'
+        nodejs 'nodejs-24-14-0'
+        jdk 'jdk-21'
     }
 
     environment {
-        SONAR_HOST_URL = 'http://sonarqube:9000'
-        SONAR_AUTH_TOKEN = credentials('sonarqube-token')
+        SONAR_SCANNER_HOME = tool 'sonarqube'
         JWT_SECRET = 'jenkins-jwt-secret'
-        MONGO_URI = 'mongodb://localhost:27017/test' // Will be overridden by in-memory in tests
+        MONGO_URI = 'mongodb://localhost:27017/test' // overridden in tests
     }
 
     stages {
-        stage('Checkout') {
-            steps { checkout scm }
-        }
-        stage('Install Dependencies') {
-            steps { sh 'npm ci' }
-        }
-        stage('Lint') {
-            steps { sh 'npm run lint' }
-        }
-        stage('Test and Coverage') {
-            steps { sh 'npm test -- --coverage' }
-            post { always { junit 'junit.xml' } }
-        }
-        stage('SonarQube Analysis') {
+
+        stage('Clean Workspace') {
             steps {
-                withSonarQubeEnv('SonarQube') {
-                    sh 'npm run sonar'
+                cleanWs()
+            }
+        }
+
+        stage('Checkout SCM') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Install Dependencies') {
+            steps {
+                sh 'npm ci'
+            }
+        }
+
+        stage('Lint') {
+            steps {
+                sh 'npm run lint'
+            }
+        }
+
+        stage('Test and Coverage') {
+            steps {
+                sh 'npm test -- --coverage'
+            }
+            post {
+                always {
+                    junit 'junit.xml' // make sure jest-junit is configured
                 }
             }
         }
+
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    sh '''
+                        $SONAR_SCANNER_HOME/bin/sonar-scanner \
+                        -Dsonar.projectKey=orderflow-api \
+                        -Dsonar.sources=src \
+                        -Dsonar.tests=tests \
+                        -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+                    '''
+                }
+            }
+        }
+
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+
         stage('Build Docker Image') {
             steps {
                 script {
@@ -40,8 +78,11 @@ pipeline {
                 }
             }
         }
-        stage('Push Docker Image') {
-            when { branch 'main' }
+
+     /*   stage('Push Docker Image') {
+            when {
+                branch 'main'
+            }
             steps {
                 script {
                     docker.withRegistry('', 'dockerhub-credentials') {
@@ -51,6 +92,12 @@ pipeline {
                 }
             }
         }
+        */
     }
-    post { always { cleanWs() } }
+
+    post {
+        always {
+            cleanWs()
+        }
+    }
 }
